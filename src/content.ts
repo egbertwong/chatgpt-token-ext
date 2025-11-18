@@ -1,6 +1,9 @@
 import { getEncoding } from "js-tiktoken";
 
 const KEY = "egbertw_token_encoder";
+const BUTTON_ID = "token-counter-button";
+const WRAPPER_ID = "token-counter-wrapper";
+const LABEL_ATTRIBUTE = "data-token-counter-label";
 type EncoderName = "o200k_base" | "cl100k_base";
 
 let currentEnc: EncoderName =
@@ -173,19 +176,39 @@ function ensureUiMounted() {
     return;
   }
 
-  // 如果按钮已经在 DOM 里，什么都不做
-  if (buttonEl && buttonEl.isConnected) return;
+  const existingButton = bar.querySelector<HTMLButtonElement>(`#${BUTTON_ID}`);
+  if (existingButton) {
+    buttonEl = existingButton;
+    labelSpan = existingButton.querySelector<HTMLSpanElement>(
+      `[${LABEL_ATTRIBUTE}="true"]`
+    );
+    return;
+  }
+
+  document
+    .querySelectorAll<HTMLButtonElement>(`#${BUTTON_ID}`)
+    .forEach((btn) => {
+      const parent = btn.parentElement;
+      if (parent && parent.id === WRAPPER_ID) {
+        parent.remove();
+      } else {
+        btn.remove();
+      }
+    });
 
   const wrapper = document.createElement("div");
+  wrapper.id = WRAPPER_ID;
   wrapper.className = "flex items-center";
 
   const btn = document.createElement("button");
+  btn.id = BUTTON_ID;
   btn.type = "button";
   btn.className =
     "btn relative btn-ghost text-token-text-primary mx-2 flex items-center gap-1";
 
   const label = document.createElement("span");
   label.textContent = "0.0k tokens";
+  label.setAttribute(LABEL_ATTRIBUTE, "true");
   labelSpan = label;
 
   const chevron = document.createElement("span");
@@ -306,6 +329,7 @@ function onUrlChange() {
   buttonEl = null;
   labelSpan = null;
   closeMenu();
+  document.getElementById(WRAPPER_ID)?.remove();
   updateObserverTarget();
   scheduleCompute(0);
 }
