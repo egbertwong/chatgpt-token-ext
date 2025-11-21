@@ -227,6 +227,8 @@ function ensureUiMounted() {
   btn.addEventListener("click", (ev) => {
     ev.stopPropagation();
     createMenuDom();
+    lastRun = 0; // force refresh so menu items get latest stats when opening
+    computeAndRender();
     toggleMenu();
   });
 
