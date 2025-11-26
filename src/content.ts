@@ -311,32 +311,47 @@ function computeAndRender() {
   }
 }
 
-// ---------- DOM 变化：监听 #page-header 的下一个兄弟 ----------
-function getObserveTarget(): Node {
+// ---------- DOM 变化监听 ----------
+// 监听 header 以保证控件存在感，同时监听 body 捕获对话区数据变化
+function getObserveTargets(): Node[] {
   const header = document.querySelector<HTMLElement>("#page-header");
-  if (header && header.nextElementSibling) {
-    return header.nextElementSibling;
-  }
-  return document.body;
+  return header ? [header, document.body] : [document.body];
 }
 
-let observeTarget: Node | null = null;
+let observeTargets: Node[] = [];
 
-const mo = new MutationObserver(() => {
-  scheduleCompute(300);
+const mo = new MutationObserver((records) => {
+  const wrapper = document.getElementById(WRAPPER_ID);
+  const onlySelfMutations =
+    wrapper &&
+    records.every((record) => {
+      const target = record.target as Node;
+      return target === wrapper || wrapper.contains(target);
+    });
+  if (!onlySelfMutations) {
+    // DOM 发生变化时稍后刷新，确保按钮和数据都跟上
+    scheduleCompute(0);
+  }
+
   updateObserverTarget();
 });
 
 function updateObserverTarget() {
-  const newTarget = getObserveTarget();
-  if (observeTarget === newTarget) return;
-  observeTarget = newTarget;
+  const newTargets = getObserveTargets();
+  const same =
+    observeTargets.length === newTargets.length &&
+    newTargets.every((t, idx) => observeTargets[idx] === t);
+  if (same) return;
+
+  observeTargets = newTargets;
   mo.disconnect();
-  mo.observe(observeTarget, {
-    childList: true,
-    subtree: true,
-    characterData: true,
-  });
+  observeTargets.forEach((t) =>
+    mo.observe(t, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    })
+  );
 }
 
 // ---------- URL 变化监听：/c/xxxxx 切换对话 ----------
@@ -359,6 +374,29 @@ setInterval(() => {
     onUrlChange();
   }
 }, 500);
+
+// 心跳补救：偶尔有延迟渲染，定期检查缺失控件或长时间未更新时再触发计算
+setInterval(() => {
+  const btn = document.getElementById(BUTTON_ID);
+  const needsMount = !btn || !document.body.contains(btn);
+  const stale = performance.now() - lastRun > 1500;
+  if (needsMount || stale) {
+    scheduleCompute(0);
+  }
+}, 1200);
+
+// 页面完全加载或 title 变化后再检查一次，避免延迟渲染导致控件丢失
+window.addEventListener("load", () => {
+  scheduleCompute(0);
+});
+
+const titleEl = document.querySelector("title");
+if (titleEl) {
+  const titleObserver = new MutationObserver(() => {
+    scheduleCompute(0);
+  });
+  titleObserver.observe(titleEl, { childList: true });
+}
 
 // 初始化
 updateObserverTarget();
