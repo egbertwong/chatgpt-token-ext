@@ -2,7 +2,6 @@ import { getEncoding } from "js-tiktoken";
 
 const KEY = "egbertw_token_encoder";
 const BUTTON_ID = "token-counter-button";
-const WRAPPER_ID = "token-counter-wrapper";
 const LABEL_ATTRIBUTE = "data-token-counter-label";
 const DEBUG_LOG = false;
 type EncoderName = "o200k_base" | "cl100k_base";
@@ -192,24 +191,14 @@ function ensureUiMounted() {
 
   document
     .querySelectorAll<HTMLButtonElement>(`#${BUTTON_ID}`)
-    .forEach((btn) => {
-      const parent = btn.parentElement;
-      if (parent && parent.id === WRAPPER_ID) {
-        parent.remove();
-      } else {
-        btn.remove();
-      }
-    });
-
-  const wrapper = document.createElement("div");
-  wrapper.id = WRAPPER_ID;
-  wrapper.className = "flex items-center";
+    .forEach((btn) => btn.remove());
+  document.getElementById("token-counter-wrapper")?.remove();
 
   const btn = document.createElement("button");
   btn.id = BUTTON_ID;
   btn.type = "button";
   btn.className =
-    "btn relative btn-ghost text-token-text-primary mx-2 flex items-center gap-1";
+    "btn relative btn-ghost text-token-text-primary ml-2 flex items-center gap-1";
 
   const label = document.createElement("span");
   label.textContent = "0.0k tokens";
@@ -232,8 +221,7 @@ function ensureUiMounted() {
     toggleMenu();
   });
 
-  wrapper.appendChild(btn);
-  bar.prepend(wrapper);
+  bar.prepend(btn);
 
   // 点击别处关闭菜单（只绑定一次）
   // @ts-ignore
@@ -321,12 +309,12 @@ function getObserveTargets(): Node[] {
 let observeTargets: Node[] = [];
 
 const mo = new MutationObserver((records) => {
-  const wrapper = document.getElementById(WRAPPER_ID);
+  const btn = document.getElementById(BUTTON_ID);
   const onlySelfMutations =
-    wrapper &&
+    btn &&
     records.every((record) => {
       const target = record.target as Node;
-      return target === wrapper || wrapper.contains(target);
+      return target === btn || btn.contains(target);
     });
   if (!onlySelfMutations) {
     // DOM 发生变化时稍后刷新，确保按钮和数据都跟上
@@ -362,7 +350,7 @@ function onUrlChange() {
   buttonEl = null;
   labelSpan = null;
   closeMenu();
-  document.getElementById(WRAPPER_ID)?.remove();
+  document.getElementById(BUTTON_ID)?.remove();
   updateObserverTarget();
   scheduleCompute(0);
 }
