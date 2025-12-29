@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@lenml/tokenizer-gemini": "^3.7.2",
     "js-tiktoken": "^1.0.21"
   },
   "devDependencies": {
