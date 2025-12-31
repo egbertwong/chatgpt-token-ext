@@ -2,11 +2,14 @@ import { TokenizerLoader } from "@lenml/tokenizers";
 
 let cachedTokenizer: any = null;
 
+/**
+ * Load DeepSeek tokenizer from bundled tokenizer.json and tokenizer_config.json files
+ * @returns Promise<Tokenizer> - The loaded tokenizer instance
+ */
 export async function fromPreTrained(): Promise<any> {
     if (cachedTokenizer) return cachedTokenizer;
 
     try {
-        // Load both tokenizer.json and tokenizer_config.json
         const tokenizerJSONPath = chrome.runtime.getURL("src/tokenizers/deepseek/tokenizer.json");
         const tokenizerConfigPath = chrome.runtime.getURL("src/tokenizers/deepseek/tokenizer_config.json");
 
@@ -18,7 +21,6 @@ export async function fromPreTrained(): Promise<any> {
         const tokenizerJSON = await tokenizerJSONResponse.json();
         const tokenizerConfig = await tokenizerConfigResponse.json();
 
-        // Load tokenizer with both required parameters
         const tokenizer = TokenizerLoader.fromPreTrained({
             tokenizerJSON,
             tokenizerConfig

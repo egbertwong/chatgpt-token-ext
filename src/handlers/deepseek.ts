@@ -2,6 +2,7 @@ import { TokenHandler } from "../core/types";
 import { fromPreTrained } from "../tokenizers/deepseek";
 
 const BUTTON_ID = "deepseek-token-counter";
+const BUTTON_GAP = 8; // Gap between token counter and upload button in pixels
 const DEBUG_LOG = false;
 
 export class DeepSeekHandler implements TokenHandler {
@@ -19,7 +20,6 @@ export class DeepSeekHandler implements TokenHandler {
 
     async init() {
         try {
-            // Pre-load tokenizer using fromPreTrained pattern
             this.tokenizer = await fromPreTrained();
         } catch (e) {
             console.error("[DeepSeekToken] Failed to load tokenizer:", e);
@@ -28,6 +28,7 @@ export class DeepSeekHandler implements TokenHandler {
         this.updateObserverTarget();
         this.scheduleCompute(0);
 
+        // Monitor URL changes for navigation between chats
         this.urlCheckTimer = window.setInterval(() => {
             const href = location.href;
             if (href !== this.lastHref) {
@@ -50,8 +51,8 @@ export class DeepSeekHandler implements TokenHandler {
             console.log('[DeepSeekToken] === Starting text extraction ===');
         }
 
-        // DeepSeek main chat area uses class: _0f72b0b ds-scroll-area
-        // Sidebar uses: _6d215eb ds-scroll-area
+        // DeepSeek main chat area: ._0f72b0b.ds-scroll-area
+        // Sidebar uses: ._6d215eb.ds-scroll-area
         const scrollArea = document.querySelector('._0f72b0b.ds-scroll-area');
 
         if (DEBUG_LOG) {
@@ -63,7 +64,7 @@ export class DeepSeekHandler implements TokenHandler {
         }
 
         if (scrollArea) {
-            // Inside the main scroll area, conversation content is in .dad65929 elements
+            // Conversation content is in .dad65929 elements
             const conversationContainers = scrollArea.querySelectorAll('.dad65929');
 
             if (DEBUG_LOG) {
@@ -81,7 +82,7 @@ export class DeepSeekHandler implements TokenHandler {
             });
         }
 
-        // Get input area content (DeepSeek uses textarea with specific placeholder)
+        // Get input area content
         const inputArea = document.querySelector('textarea[placeholder*="DeepSeek"], textarea');
         if (inputArea) {
             const inputText = (inputArea.textContent || (inputArea as HTMLTextAreaElement).value || "").trim();
@@ -109,13 +110,12 @@ export class DeepSeekHandler implements TokenHandler {
             return;
         }
 
-        // Check if our button already exists
-        let existing = document.getElementById(BUTTON_ID);
+        // Check if button already exists
+        const existing = document.getElementById(BUTTON_ID);
         if (existing) {
             this.containerEl = existing as HTMLElement;
             this.labelSpan = existing.querySelector(".token-label");
             this.uploadButtonRef = uploadButton;
-            // Update position and recalculate width
             this.updateButtonPosition();
             return;
         }
@@ -123,19 +123,17 @@ export class DeepSeekHandler implements TokenHandler {
         // Create button matching DeepSeek's style
         const button = document.createElement("div");
         button.id = BUTTON_ID;
-        // Remove ds-icon-button--sizing-container to avoid fixed circular size
         button.className = "_57370c5 _5dedc1e ds-icon-button ds-icon-button--l";
         button.setAttribute("tabindex", "0");
         button.setAttribute("role", "button");
         button.setAttribute("aria-disabled", "false");
 
-        // Position to the left of upload button (will be updated after measuring width)
+        // Style overrides for pill shape
         button.style.position = 'fixed';
         button.style.zIndex = '1000';
-        // Use !important to override DeepSeek's circular button styles
         button.style.cssText += 'border-radius: 20px !important; overflow: hidden !important; width: auto !important; height: 34px !important; min-width: fit-content !important; max-width: max-content !important; display: inline-flex !important; align-items: center !important;';
 
-        // Add custom hover background for pill shape (not circular)
+        // Hover background (pill-shaped, not circular)
         const hoverBg = document.createElement("div");
         hoverBg.className = "ds-text-button__hover-bg";
         hoverBg.style.cssText = `
@@ -150,22 +148,39 @@ export class DeepSeekHandler implements TokenHandler {
             left: 0;
         `;
 
-        // Create label for token count
+        // Token count label
         const label = document.createElement("div");
         label.className = "token-label";
+
+        // Detect theme by checking the computed color of the upload button
+        const updateLabelColor = () => {
+            const uploadButtonColor = window.getComputedStyle(uploadButton).color;
+            // If upload button is light colored (rgb values > 128), it's dark mode
+            const rgb = uploadButtonColor.match(/\d+/g);
+            if (rgb && rgb.length >= 3) {
+                const brightness = (parseInt(rgb[0]) + parseInt(rgb[1]) + parseInt(rgb[2])) / 3;
+                label.style.color = brightness > 128 ? '#e3e3e3' : '#1f2329';
+            } else {
+                // Fallback to black for light mode
+                label.style.color = '#1f2329';
+            }
+        };
+
         label.style.cssText = `
             padding: 0 12px;
             font-size: 14px;
             font-weight: 500;
             white-space: nowrap;
-            color: var(--ds-gray-900, #1f2329);
             position: relative;
             z-index: 1;
         `;
         label.textContent = "0 tokens";
         this.labelSpan = label;
 
-        // Add focus ring
+        // Set initial color
+        updateLabelColor();
+
+        // Focus ring
         const focusRing = document.createElement("div");
         focusRing.className = "ds-focus-ring";
 
@@ -176,10 +191,9 @@ export class DeepSeekHandler implements TokenHandler {
         this.containerEl = button;
         this.uploadButtonRef = uploadButton;
 
-        // Append to body
         document.body.appendChild(button);
 
-        // Add hover effect
+        // Hover effect
         button.addEventListener('mouseenter', () => {
             hoverBg.style.backgroundColor = 'var(--ds-icon-button-hover-color, rgba(0, 0, 0, 0.05))';
         });
@@ -187,22 +201,30 @@ export class DeepSeekHandler implements TokenHandler {
             hoverBg.style.backgroundColor = 'transparent';
         });
 
-        // Set initial position after button is rendered and has width
-        // Cache the button width to avoid recalculation during hover
+        // Watch for theme changes by observing the upload button's color
+        const themeObserver = new MutationObserver(() => {
+            updateLabelColor();
+        });
+
+        themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class', 'data-theme', 'style'],
+            subtree: true
+        });
+
+        // Initial positioning
         let cachedButtonWidth = 0;
         requestAnimationFrame(() => {
             const uploadRect = uploadButton.getBoundingClientRect();
             cachedButtonWidth = button.offsetWidth;
-            // Position based on upload button's position, accounting for our button width + gap
-            button.style.left = `${uploadRect.left - cachedButtonWidth - 8}px`;
+            button.style.left = `${uploadRect.left - cachedButtonWidth - BUTTON_GAP}px`;
             button.style.top = `${uploadRect.top}px`;
         });
 
-        // Update position on scroll/resize (use cached width to avoid jumps)
+        // Update position on scroll/resize
         const updatePosition = () => {
             const uploadRect = uploadButton.getBoundingClientRect();
-            // Use cached width instead of recalculating to avoid hover-induced jumps
-            button.style.left = `${uploadRect.left - cachedButtonWidth - 8}px`;
+            button.style.left = `${uploadRect.left - cachedButtonWidth - BUTTON_GAP}px`;
             button.style.top = `${uploadRect.top}px`;
         };
 
@@ -213,12 +235,12 @@ export class DeepSeekHandler implements TokenHandler {
     private updateButtonPosition() {
         if (!this.containerEl || !this.uploadButtonRef) return;
 
-        // Recalculate button width (in case content changed)
+        // Recalculate button width when content changes
         this.cachedButtonWidth = this.containerEl.offsetWidth;
 
         // Update position
         const uploadRect = this.uploadButtonRef.getBoundingClientRect();
-        this.containerEl.style.left = `${uploadRect.left - this.cachedButtonWidth - 8}px`;
+        this.containerEl.style.left = `${uploadRect.left - this.cachedButtonWidth - BUTTON_GAP}px`;
         this.containerEl.style.top = `${uploadRect.top}px`;
     }
 
@@ -245,21 +267,20 @@ export class DeepSeekHandler implements TokenHandler {
                     console.log('[DeepSeekToken] Number of text segments:', texts.length);
                 }
 
-                for (const t of texts) {
-                    if (t) {
+                for (const text of texts) {
+                    if (text) {
                         try {
-                            const encoded = this.tokenizer.encode(t);
-                            // Handle different return formats from tokenizer
+                            const encoded = this.tokenizer.encode(text);
                             if (encoded && encoded.ids) {
                                 const tokenCount = encoded.ids.length;
                                 totalTokens += tokenCount;
                                 if (DEBUG_LOG) {
-                                    console.log(`[DeepSeekToken] Encoded ${t.length} chars -> ${tokenCount} tokens`);
+                                    console.log(`[DeepSeekToken] Encoded ${text.length} chars -> ${tokenCount} tokens`);
                                 }
                             } else if (Array.isArray(encoded)) {
                                 totalTokens += encoded.length;
                                 if (DEBUG_LOG) {
-                                    console.log(`[DeepSeekToken] Encoded ${t.length} chars -> ${encoded.length} tokens (array format)`);
+                                    console.log(`[DeepSeekToken] Encoded ${text.length} chars -> ${encoded.length} tokens (array format)`);
                                 }
                             } else {
                                 console.warn('[DeepSeekToken] Unexpected encode result:', encoded);
@@ -279,13 +300,14 @@ export class DeepSeekHandler implements TokenHandler {
                 return;
             }
 
+            // Update label
             if (totalTokens >= 1000) {
                 this.labelSpan.textContent = `${(totalTokens / 1000).toFixed(1)}k tokens`;
             } else {
                 this.labelSpan.textContent = `${totalTokens} tokens`;
             }
 
-            // Update button position after text change (width may have changed)
+            // Update position after text change
             this.updateButtonPosition();
         } catch (e) {
             console.error("[DeepSeekToken] error:", e);
