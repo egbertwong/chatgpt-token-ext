@@ -3,4 +3,4 @@ export interface TokenHandler {
     destroy(): void;
 }
 
-export type ModelType = "chatgpt" | "gemini";
+export type ModelType = "chatgpt" | "gemini" | "deepseek";

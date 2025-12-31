@@ -1,5 +1,6 @@
 import { ChatGPTHandler } from "../handlers/chatgpt";
 import { GeminiHandler } from "../handlers/gemini";
+import { DeepSeekHandler } from "../handlers/deepseek";
 import { TokenHandler } from "./types";
 
 export function getHandler(): TokenHandler | null {
@@ -9,6 +10,9 @@ export function getHandler(): TokenHandler | null {
     }
     if (host.includes("gemini.google.com")) {
         return new GeminiHandler();
+    }
+    if (host.includes("chat.deepseek.com")) {
+        return new DeepSeekHandler();
     }
     return null;
 }

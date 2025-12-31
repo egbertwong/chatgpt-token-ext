@@ -1,14 +1,15 @@
 {
     "manifest_version": 3,
-    "name": "AI Token Counter (ChatGPT & Gemini)",
+    "name": "AI Token Counter (ChatGPT, Gemini & DeepSeek)",
     "version": "1.1.0",
-    "description": "Count tokens on ChatGPT and Gemini web using local tokenizers.",
+    "description": "Count tokens on ChatGPT, Gemini and DeepSeek web using local tokenizers.",
     "content_scripts": [
         {
             "matches": [
                 "https://chat.openai.com/*",
                 "https://chatgpt.com/*",
-                "https://gemini.google.com/*"
+                "https://gemini.google.com/*",
+                "https://chat.deepseek.com/*"
             ],
             "js": [
                 "dist/content.js"
@@ -20,6 +21,18 @@
     "host_permissions": [
         "https://chat.openai.com/*",
         "https://chatgpt.com/*",
-        "https://gemini.google.com/*"
+        "https://gemini.google.com/*",
+        "https://chat.deepseek.com/*"
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "src/tokenizers/deepseek/tokenizer.json",
+                "src/tokenizers/deepseek/tokenizer_config.json"
+            ],
+            "matches": [
+                "https://chat.deepseek.com/*"
+            ]
+        }
     ]
 }
