@@ -83,7 +83,7 @@ ai-chat-token-counter/
 │   │   └── deepseek.ts         # DeepSeek implementation
 │   └── tokenizers/
 │       └── deepseek/           # DeepSeek tokenizer files
-├── __tests__/                  # Test files
+├── tests/                      # Test files
 ├── manifest.json               # Extension manifest
 └── esbuild.config.mjs          # Build configuration
 ```
@@ -130,9 +130,9 @@ npm run test:coverage
 
 ### Test Structure
 
-- `__tests__/core/` - Core handler selection logic
-- `__tests__/handlers/` - Platform-specific handler tests
-- `__tests__/tokenizers/` - Tokenizer loading and caching tests
+- `tests/core/` - Core handler selection logic
+- `tests/handlers/` - Platform-specific handler tests
+- `tests/tokenizers/` - Tokenizer loading and caching tests
 
 ### Coverage Report
 
