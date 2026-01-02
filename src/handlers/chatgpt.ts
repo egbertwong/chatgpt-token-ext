@@ -1,5 +1,6 @@
 import { getEncoding } from "js-tiktoken";
-import { TokenHandler } from "../core/types";
+import { BaseHandler } from "../core/BaseHandler";
+import { formatTokenCount } from "../utils/format";
 
 const KEY = "egbertw_token_encoder";
 const BUTTON_ID = "token-counter-button";
@@ -7,7 +8,7 @@ const LABEL_ATTRIBUTE = "data-token-counter-label";
 const DEBUG_LOG = false;
 type EncoderName = "o200k_base" | "cl100k_base";
 
-export class ChatGPTHandler implements TokenHandler {
+export class ChatGPTHandler extends BaseHandler {
     private currentEnc: EncoderName =
         (localStorage.getItem(KEY) as EncoderName) || "o200k_base";
     private encoders = new Map<EncoderName, ReturnType<typeof getEncoding>>();
@@ -21,26 +22,23 @@ export class ChatGPTHandler implements TokenHandler {
     private switchItem: HTMLDivElement | null = null;
     private timer: number | null = null;
     private lastRun = 0;
-    private mo: MutationObserver | null = null;
     private observeTargets: Node[] = [];
-    private urlCheckTimer: number | null = null;
     private lastHref = location.href;
-    private mountCheckTimer: number | null = null;
-    private titleObserver: MutationObserver | null = null;
 
     init() {
         this.updateObserverTarget();
         this.scheduleCompute(0);
 
-        this.urlCheckTimer = window.setInterval(() => {
+        const urlCheckTimer = window.setInterval(() => {
             const href = location.href;
             if (href !== this.lastHref) {
                 this.lastHref = href;
                 this.onUrlChange();
             }
         }, 500);
+        this.registerTimer(urlCheckTimer);
 
-        this.mountCheckTimer = window.setInterval(() => {
+        const mountCheckTimer = window.setInterval(() => {
             const btn = document.getElementById(BUTTON_ID);
             const needsMount = !btn || !document.body.contains(btn);
             const stale = performance.now() - this.lastRun > 1500;
@@ -48,13 +46,15 @@ export class ChatGPTHandler implements TokenHandler {
                 this.scheduleCompute(0);
             }
         }, 1200);
+        this.registerTimer(mountCheckTimer);
 
         const titleEl = document.querySelector("title");
         if (titleEl) {
-            this.titleObserver = new MutationObserver(() => {
+            const titleObserver = new MutationObserver(() => {
                 this.scheduleCompute(0);
             });
-            this.titleObserver.observe(titleEl, { childList: true });
+            titleObserver.observe(titleEl, { childList: true });
+            this.registerObserver(titleObserver);
         }
 
         window.addEventListener("load", () => {
@@ -71,10 +71,7 @@ export class ChatGPTHandler implements TokenHandler {
     }
 
     destroy() {
-        if (this.urlCheckTimer) clearInterval(this.urlCheckTimer);
-        if (this.mountCheckTimer) clearInterval(this.mountCheckTimer);
-        if (this.mo) this.mo.disconnect();
-        if (this.titleObserver) this.titleObserver.disconnect();
+        super.destroy(); // Cleanup timers and observers
         this.closeMenu();
         document.getElementById(BUTTON_ID)?.remove();
     }
@@ -315,8 +312,7 @@ export class ChatGPTHandler implements TokenHandler {
             const turns = texts.length;
 
             if (this.labelSpan) {
-                const k = total / 1000;
-                this.labelSpan.textContent = `${k.toFixed(1)}k tokens`;
+                this.labelSpan.textContent = formatTokenCount(total);
             }
             if (this.charsItem) this.charsItem.textContent = `Chars: ${chars}`;
             if (this.turnsItem) this.turnsItem.textContent = `Turns: ${turns}`;
@@ -341,9 +337,8 @@ export class ChatGPTHandler implements TokenHandler {
         if (same) return;
 
         this.observeTargets = newTargets;
-        if (this.mo) this.mo.disconnect();
 
-        this.mo = new MutationObserver((records) => {
+        const mo = new MutationObserver((records) => {
             const btn = document.getElementById(BUTTON_ID);
             const onlySelfMutations =
                 btn &&
@@ -356,9 +351,10 @@ export class ChatGPTHandler implements TokenHandler {
             }
             this.updateObserverTarget();
         });
+        this.registerObserver(mo);
 
         this.observeTargets.forEach((t) =>
-            this.mo!.observe(t, {
+            mo.observe(t, {
                 childList: true,
                 subtree: true,
                 characterData: true,

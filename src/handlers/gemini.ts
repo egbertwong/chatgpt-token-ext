@@ -1,18 +1,17 @@
-import { TokenHandler } from "../core/types";
+import { BaseHandler } from "../core/BaseHandler";
+import { formatTokenCount } from "../utils/format";
 import { fromPreTrained } from "@lenml/tokenizer-gemini";
 
 const BUTTON_ID = "gemini-token-counter";
 const DEBUG_LOG = false;
 
-export class GeminiHandler implements TokenHandler {
+export class GeminiHandler extends BaseHandler {
     private tokenizer: any = null;
     private containerEl: HTMLElement | null = null;
     private labelSpan: HTMLSpanElement | null = null;
     private timer: number | null = null;
     private lastRun = 0;
-    private mo: MutationObserver | null = null;
     private observeTargets: Node[] = [];
-    private urlCheckTimer: number | null = null;
     private lastHref = location.href;
 
     async init() {
@@ -25,18 +24,18 @@ export class GeminiHandler implements TokenHandler {
         this.updateObserverTarget();
         this.scheduleCompute(0);
 
-        this.urlCheckTimer = window.setInterval(() => {
+        const urlCheckTimer = window.setInterval(() => {
             const href = location.href;
             if (href !== this.lastHref) {
                 this.lastHref = href;
                 this.onUrlChange();
             }
         }, 500);
+        this.registerTimer(urlCheckTimer);
     }
 
     destroy() {
-        if (this.urlCheckTimer) clearInterval(this.urlCheckTimer);
-        if (this.mo) this.mo.disconnect();
+        super.destroy(); // Cleanup timers and observers
         document.getElementById(BUTTON_ID)?.remove();
     }
 
@@ -165,11 +164,7 @@ export class GeminiHandler implements TokenHandler {
                 return;
             }
 
-            if (totalTokens >= 1000) {
-                this.labelSpan.textContent = `${(totalTokens / 1000).toFixed(1)}k tokens`;
-            } else {
-                this.labelSpan.textContent = `${totalTokens} tokens`;
-            }
+            this.labelSpan.textContent = formatTokenCount(totalTokens);
 
             if (DEBUG_LOG) {
                 const totalChars = texts.join("").length;
@@ -200,15 +195,15 @@ export class GeminiHandler implements TokenHandler {
         if (same) return;
 
         this.observeTargets = newTargets;
-        if (this.mo) this.mo.disconnect();
 
-        this.mo = new MutationObserver(() => {
+        const mo = new MutationObserver(() => {
             this.scheduleCompute(0);
             this.updateObserverTarget();
         });
+        this.registerObserver(mo);
 
         this.observeTargets.forEach((t) =>
-            this.mo!.observe(t, {
+            mo.observe(t, {
                 childList: true,
                 subtree: true,
                 characterData: true,

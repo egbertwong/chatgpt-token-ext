@@ -1,19 +1,18 @@
-import { TokenHandler } from "../core/types";
+import { BaseHandler } from "../core/BaseHandler";
+import { formatTokenCount } from "../utils/format";
 import { fromPreTrained } from "../tokenizers/deepseek";
 
 const BUTTON_ID = "deepseek-token-counter";
 const BUTTON_GAP = 8; // Gap between token counter and upload button in pixels
 const DEBUG_LOG = false;
 
-export class DeepSeekHandler implements TokenHandler {
+export class DeepSeekHandler extends BaseHandler {
     private tokenizer: any = null;
     private containerEl: HTMLElement | null = null;
     private labelSpan: HTMLSpanElement | null = null;
     private timer: number | null = null;
     private lastRun = 0;
-    private mo: MutationObserver | null = null;
     private observeTargets: Node[] = [];
-    private urlCheckTimer: number | null = null;
     private lastHref = location.href;
     private cachedButtonWidth = 0;
     private uploadButtonRef: HTMLElement | null = null;
@@ -29,18 +28,18 @@ export class DeepSeekHandler implements TokenHandler {
         this.scheduleCompute(0);
 
         // Monitor URL changes for navigation between chats
-        this.urlCheckTimer = window.setInterval(() => {
+        const urlCheckTimer = window.setInterval(() => {
             const href = location.href;
             if (href !== this.lastHref) {
                 this.lastHref = href;
                 this.onUrlChange();
             }
         }, 500);
+        this.registerTimer(urlCheckTimer);
     }
 
     destroy() {
-        if (this.urlCheckTimer) clearInterval(this.urlCheckTimer);
-        if (this.mo) this.mo.disconnect();
+        super.destroy(); // Cleanup timers and observers
         document.getElementById(BUTTON_ID)?.remove();
     }
 
@@ -301,11 +300,7 @@ export class DeepSeekHandler implements TokenHandler {
             }
 
             // Update label
-            if (totalTokens >= 1000) {
-                this.labelSpan.textContent = `${(totalTokens / 1000).toFixed(1)}k tokens`;
-            } else {
-                this.labelSpan.textContent = `${totalTokens} tokens`;
-            }
+            this.labelSpan.textContent = formatTokenCount(totalTokens);
 
             // Update position after text change
             this.updateButtonPosition();
@@ -331,15 +326,15 @@ export class DeepSeekHandler implements TokenHandler {
         if (same) return;
 
         this.observeTargets = newTargets;
-        if (this.mo) this.mo.disconnect();
 
-        this.mo = new MutationObserver(() => {
+        const mo = new MutationObserver(() => {
             this.scheduleCompute(0);
             this.updateObserverTarget();
         });
+        this.registerObserver(mo);
 
         this.observeTargets.forEach((t) =>
-            this.mo!.observe(t, {
+            mo.observe(t, {
                 childList: true,
                 subtree: true,
                 characterData: true,
